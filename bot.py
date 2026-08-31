@@ -24,7 +24,11 @@ from admin import (
     register_admin_handlers
 )
 from security import register_security_handlers
-from force_sub import check_subscription, subscription_required
+from force_sub import (
+    check_subscription,
+    subscription_required,
+    register_force_sub_handlers
+)
 # =========================================================
 # BOT
 # =========================================================
