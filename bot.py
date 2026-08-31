@@ -8,7 +8,7 @@ from database import init_db, create_user, get_user
 from user import register_user_handlers
 from transactions import register_transaction_handlers
 from admin import register_admin_handlers
-
+from payments import register_payment_handlers
 
 bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
@@ -94,6 +94,7 @@ def register_handlers():
     register_user_handlers(dp)
     register_transaction_handlers(dp)
     register_admin_handlers(dp)
+    register_payment_handlers(dp)
 
 
 async def main():
