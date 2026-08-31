@@ -25,7 +25,11 @@ from database import (
     get_user_by_account,
     add_transaction
 )
+import qrcode
+import os
+import time
 
+from aiogram.types import FSInputFile
 
 # =========================================================
 # STATES
