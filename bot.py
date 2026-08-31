@@ -23,7 +23,7 @@ from payments import (
 from admin import (
     register_admin_handlers
 )
-
+from security import register_security_handlers
 
 # =========================================================
 # BOT
@@ -105,7 +105,7 @@ def register_handlers():
 
     # Admin
     register_admin_handlers(dp)
-
+    register_security_handlers(dp)
 
 # =========================================================
 # MAIN
