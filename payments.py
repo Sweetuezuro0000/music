@@ -789,7 +789,7 @@ async def send_cancel(
 
 
 # =========================================================
-# ADD MONEY
+# ADD MONEY START
 # =========================================================
 
 async def add_money_start(
@@ -797,12 +797,9 @@ async def add_money_start(
     state: FSMContext
 ):
 
-    user = get_user(
-        callback.from_user.id
-    )
+    user = get_user(callback.from_user.id)
 
     if not user:
-
         await callback.answer(
             "Use /start first.",
             show_alert=True
@@ -810,7 +807,6 @@ async def add_money_start(
         return
 
     if user[6] == 1:
-
         await callback.answer(
             "🔒 Account frozen.",
             show_alert=True
@@ -826,9 +822,12 @@ async def add_money_start(
         "➕ <b>ADD MONEY</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
 
-        "Enter the amount you want to add.\n\n"
-        "💡 A deposit request will be sent "
-        "for approval.",
+        "💰 Enter the amount you want to add.\n\n"
+        "You will receive a UPI QR for the "
+        "exact amount.\n\n"
+
+        "Example:\n"
+        "<code>500</code>",
 
         parse_mode="HTML"
     )
@@ -837,7 +836,7 @@ async def add_money_start(
 
 
 # =========================================================
-# ADD MONEY AMOUNT
+# ADD MONEY AMOUNT → QR
 # =========================================================
 
 async def add_money_amount(
@@ -846,27 +845,149 @@ async def add_money_amount(
 ):
 
     try:
-
-        amount = float(
-            message.text.strip()
-        )
+        amount = float(message.text.strip())
 
     except ValueError:
-
         await message.answer(
-            "❌ Enter a valid amount."
+            "❌ Please enter a valid amount."
         )
-
         return
 
     if amount <= 0:
-
         await message.answer(
-            "❌ Invalid amount."
+            "❌ Amount must be greater than ₹0."
         )
-
         return
 
+    if amount > MAX_SEND:
+        await message.answer(
+            f"❌ Maximum allowed amount is "
+            f"{CURRENCY}{MAX_SEND:,.2f}."
+        )
+        return
+
+    amount_text = f"{amount:.2f}"
+
+    # UPI payment URI
+    upi_uri = (
+        "upi://pay?"
+        "pa=emiakura00@oksbi"
+        "&pn=MyBank"
+        f"&am={amount_text}"
+        "&cu=INR"
+    )
+
+    # QR folder
+    os.makedirs("qr_codes", exist_ok=True)
+
+    filename = (
+        f"qr_codes/"
+        f"{message.from_user.id}_"
+        f"{int(time.time())}.png"
+    )
+
+    # Generate QR
+    qr = qrcode.QRCode(
+        version=1,
+        box_size=10,
+        border=4
+    )
+
+    qr.add_data(upi_uri)
+    qr.make(fit=True)
+
+    img = qr.make_image()
+
+    img.save(filename)
+
+    await state.update_data(
+        amount=amount,
+        qr_file=filename
+    )
+
+    await message.answer_photo(
+
+        photo=FSInputFile(filename),
+
+        caption=(
+
+            "💳 <b>ADD MONEY</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+
+            f"💰 Amount\n"
+            f"<b>₹ {amount:,.2f}</b>\n\n"
+
+            "📲 Scan this QR using any supported "
+            "UPI app.\n\n"
+
+            "⚠️ Pay the exact amount shown above.\n"
+            "After payment, tap the button below "
+            "to continue."
+
+        ),
+
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+
+                [
+                    InlineKeyboardButton(
+                        text="✅ I Have Paid",
+                        callback_data="money_paid"
+                    )
+                ],
+
+                [
+                    InlineKeyboardButton(
+                        text="❌ Cancel",
+                        callback_data="add_money_cancel"
+                    )
+                ]
+
+            ]
+        ),
+
+        parse_mode="HTML"
+    )
+
+
+# =========================================================
+# I HAVE PAID
+# =========================================================
+
+async def money_paid(
+    callback: CallbackQuery,
+    state: FSMContext
+):
+
+    data = await state.get_data()
+
+    amount = data.get("amount")
+
+    if not amount:
+
+        await callback.answer(
+            "Payment session expired.",
+            show_alert=True
+        )
+
+        await state.clear()
+        return
+
+    user = get_user(
+        callback.from_user.id
+    )
+
+    if not user:
+
+        await callback.answer(
+            "Account not found.",
+            show_alert=True
+        )
+
+        await state.clear()
+        return
+
+    # Create pending deposit request
     con = connect()
     cur = con.cursor()
 
@@ -881,7 +1002,7 @@ async def add_money_amount(
         )
         VALUES (?, ?, ?, ?, ?)
     """, (
-        message.from_user.id,
+        user[0],
         "DEPOSIT",
         amount,
         "pending",
@@ -895,38 +1016,104 @@ async def add_money_amount(
     con.commit()
     con.close()
 
-    await message.answer(
-
-        f"✅ <b>DEPOSIT REQUEST CREATED</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n\n"
-
-        f"💰 Amount\n"
-        f"<b>{CURRENCY}{amount:,.2f}</b>\n\n"
-
-        f"🧾 Request ID\n"
-        f"<code>#{request_id}</code>\n\n"
-
-        "⏳ Waiting for admin approval.",
-
-        parse_mode="HTML"
-    )
-
-    await message.bot.send_message(
-
-        ADMIN_ID,
-
-        f"➕ <b>NEW DEPOSIT REQUEST</b>\n\n"
-        f"👤 User: <code>{message.from_user.id}</code>\n"
-        f"💰 Amount: <b>{CURRENCY}{amount:,.2f}</b>\n"
-        f"🧾 Request: <code>#{request_id}</code>",
-
-        parse_mode="HTML"
-    )
-
     await state.clear()
+
+    await callback.message.edit_caption(
+
+        caption=(
+
+            "⏳ <b>PAYMENT UNDER REVIEW</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+
+            f"💰 Amount\n"
+            f"<b>₹ {amount:,.2f}</b>\n\n"
+
+            f"🧾 Request ID\n"
+            f"<code>#{request_id}</code>\n\n"
+
+            "Your deposit request has been "
+            "submitted for verification.\n\n"
+
+            "💡 Balance will be updated only "
+            "after the payment is verified."
+
+        ),
+
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+
+                [
+                    InlineKeyboardButton(
+                        text="🏠 Main Menu",
+                        callback_data="user_home"
+                    )
+                ]
+
+            ]
+        ),
+
+        parse_mode="HTML"
+    )
+
+    # Admin notification
+    try:
+
+        await callback.bot.send_message(
+
+            ADMIN_ID,
+
+            "💰 <b>NEW DEPOSIT REQUEST</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+
+            f"👤 User: <code>{user[0]}</code>\n"
+            f"🔢 Account: <code>{user[3]}</code>\n"
+            f"💰 Amount: <b>₹ {amount:,.2f}</b>\n"
+            f"🧾 Request: <code>#{request_id}</code>\n\n"
+
+            "⏳ Status: <b>PENDING</b>",
+
+            parse_mode="HTML"
+        )
+
+    except Exception:
+        pass
+
+    await callback.answer()
 
 
 # =========================================================
+# ADD MONEY CANCEL
+# =========================================================
+
+async def add_money_cancel(
+    callback: CallbackQuery,
+    state: FSMContext
+):
+
+    await state.clear()
+
+    await callback.message.edit_caption(
+
+        caption=(
+            "❌ <b>ADD MONEY CANCELLED</b>\n\n"
+            "No deposit request was created."
+        ),
+
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🏠 Main Menu",
+                        callback_data="user_home"
+                    )
+                ]
+            ]
+        ),
+
+        parse_mode="HTML"
+    )
+
+    await callback.answer()# =========================================================
 # WITHDRAW START
 # =========================================================
 
