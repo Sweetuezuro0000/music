@@ -24,7 +24,7 @@ from admin import (
     register_admin_handlers
 )
 from security import register_security_handlers
-
+from force_sub import check_subscription, subscription_required
 # =========================================================
 # BOT
 # =========================================================
@@ -36,10 +36,6 @@ bot = Bot(
 dp = Dispatcher()
 
 
-# =========================================================
-# START
-# =========================================================
-
 @dp.message(CommandStart())
 async def start(message: Message):
 
@@ -49,45 +45,48 @@ async def start(message: Message):
         first_name=message.from_user.first_name
     )
 
-    # Account frozen
+    # FORCE SUBSCRIBE
+    joined = await check_subscription(
+        bot,
+        message.from_user.id
+    )
+
+    if not joined:
+
+        await subscription_required(
+            message
+        )
+
+        return
+
+    # FROZEN ACCOUNT
     if user[6] == 1:
 
         await message.answer(
-            "🔒 <b>ACCOUNT FROZEN</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "Your account is currently frozen.\n\n"
-            "Please contact support for assistance.",
+            "🔒 <b>ACCOUNT FROZEN</b>\n\n"
+            "Your account is currently frozen.\n"
+            "Please contact support.",
             parse_mode="HTML"
         )
 
         return
 
-    # Premium home screen
+    # NORMAL HOME
     await message.answer(
-
         f"🏦 <b>MYBANK</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
-
         f"👋 Welcome back,\n"
         f"<b>{user[2]}</b>\n\n"
-
         f"💰 <b>AVAILABLE BALANCE</b>\n\n"
         f"<code>₹ {user[4]:,.2f}</code>\n\n"
-
         f"🔢 Account Number\n"
         f"<code>{user[3]}</code>\n\n"
-
         f"🟢 Account Active\n\n"
-
         f"━━━━━━━━━━━━━━━━━━\n"
         f"<b>QUICK ACTIONS</b>",
-
         reply_markup=user_menu(),
-
         parse_mode="HTML"
     )
-
-
 # =========================================================
 # REGISTER ALL MODULES
 # =========================================================
@@ -106,7 +105,7 @@ def register_handlers():
     # Admin
     register_admin_handlers(dp)
     register_security_handlers(dp)
-
+    register_force_sub_handlers(dp)
 # =========================================================
 # MAIN
 # =========================================================
