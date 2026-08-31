@@ -1308,4 +1308,71 @@ async def withdraw_amount(
 
     await state.clear()
 
+# =========================================================
+# REGISTER PAYMENT HANDLERS
+# =========================================================
 
+def register_payment_handlers(dp):
+
+    # SEND
+    dp.callback_query.register(
+        send_start,
+        F.data == "send"
+    )
+
+    dp.message.register(
+        send_account,
+        SendState.account
+    )
+
+    dp.message.register(
+        send_amount,
+        SendState.amount
+    )
+
+    dp.message.register(
+        send_pin,
+        SendState.pin
+    )
+
+    dp.callback_query.register(
+        confirm_transfer,
+        F.data == "confirm_transfer"
+    )
+
+    dp.callback_query.register(
+        send_cancel,
+        F.data == "send_cancel"
+    )
+
+    # ADD MONEY
+    dp.callback_query.register(
+        add_money_start,
+        F.data == "add_money"
+    )
+
+    dp.message.register(
+        add_money_amount,
+        AddMoneyState.amount
+    )
+
+    dp.callback_query.register(
+        money_paid,
+        F.data == "money_paid"
+    )
+
+    dp.callback_query.register(
+        add_money_cancel,
+        F.data == "add_money_cancel"
+    )
+
+    # WITHDRAW
+    dp.callback_query.register(
+        withdraw_start,
+        F.data == "withdraw"
+    )
+
+    dp.message.register(
+        withdraw_amount,
+        WithdrawState.amount
+    )
