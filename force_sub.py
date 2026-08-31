@@ -7,39 +7,44 @@ from aiogram.types import (
 from aiogram.enums import ChatMemberStatus
 
 
-CHANNEL = "@sweetu_friends_group"
+GROUP = "@sweetu_friends_group"
 
 
 def subscribe_keyboard():
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
+
             [
                 InlineKeyboardButton(
                     text="👥 Join Group",
                     url="https://t.me/sweetu_friends_group"
                 )
             ],
+
             [
                 InlineKeyboardButton(
                     text="✅ I've Joined",
                     callback_data="check_subscription"
                 )
             ]
+
         ]
     )
 
 
-async def check_subscription(
-    bot,
-    user_id
-):
+async def check_subscription(bot, user_id):
 
     try:
 
         member = await bot.get_chat_member(
-            CHANNEL,
-            user_id
+            chat_id=GROUP,
+            user_id=user_id
+        )
+
+        print(
+            f"SUB CHECK | user={user_id} "
+            f"| status={member.status}"
         )
 
         return member.status in [
@@ -48,27 +53,30 @@ async def check_subscription(
             ChatMemberStatus.CREATOR
         ]
 
-    except Exception:
+    except Exception as e:
+
+        print(
+            f"SUB CHECK ERROR | user={user_id} | {e}"
+        )
 
         return False
 
 
-async def subscription_required(
-    message
-):
+async def subscription_required(message):
 
-    return await message.answer(
+    await message.answer(
 
         "🔒 <b>JOIN REQUIRED</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
 
-        "To use <b>MyBank</b>, please join our "
-        "official group first.\n\n"
+        "Welcome to <b>MyBank</b> 🏦\n\n"
+
+        "To continue, first join our official group:\n\n"
 
         "👥 <b>@sweetu_friends_group</b>\n\n"
 
-        "After joining, tap "
-        "<b>I've Joined</b>.",
+        "After joining, press "
+        "<b>I've Joined</b> below.",
 
         reply_markup=subscribe_keyboard(),
 
@@ -96,17 +104,21 @@ async def check_subscription_callback(
 
     await callback.message.edit_text(
 
-        "✅ <b>VERIFIED</b>\n\n"
-        "You can now use MyBank.",
+        "✅ <b>MEMBERSHIP VERIFIED</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+
+        "You can now access your MyBank account.",
 
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
+
                 [
                     InlineKeyboardButton(
-                        text="🏠 Open MyBank",
+                        text="🏦 Open MyBank",
                         callback_data="user_home"
                     )
                 ]
+
             ]
         ),
 
@@ -114,7 +126,7 @@ async def check_subscription_callback(
     )
 
     await callback.answer(
-        "Membership verified!"
+        "✅ Verified!"
     )
 
 
