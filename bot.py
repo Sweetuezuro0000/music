@@ -1,571 +1,141 @@
-from user import register_user_handlers, user_menu
-from aiogram import F
-from aiogram.filters import Command
-from aiogram.types import (
-    Message,
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
+import asyncio
+
+from aiogram import Bot, Dispatcher
+from aiogram.filters import CommandStart
+from aiogram.types import Message
+
+from config import BOT_TOKEN
+from database import init_db, create_user
+
+from user import (
+    register_user_handlers,
+    user_menu
 )
 
-from config import ADMIN_ID
-from database import (
-    connect,
-    get_user,
-    update_balance,
-    set_frozen,
-    add_transaction
+from transactions import (
+    register_transaction_handlers
+)
+
+from payments import (
+    register_payment_handlers
+)
+
+from admin import (
+    register_admin_handlers
 )
 
 
 # =========================================================
-# ADMIN CHECK
+# BOT
 # =========================================================
 
-def is_admin(user_id):
-    return user_id == ADMIN_ID
+bot = Bot(
+    token=BOT_TOKEN
+)
+
+dp = Dispatcher()
 
 
 # =========================================================
-# MAIN ADMIN KEYBOARD
+# START
 # =========================================================
 
-def admin_keyboard():
+@dp.message(CommandStart())
+async def start(message: Message):
 
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-
-            [
-                InlineKeyboardButton(
-                    text="👥 Users",
-                    callback_data="admin_users"
-                ),
-                InlineKeyboardButton(
-                    text="📋 Requests",
-                    callback_data="admin_requests"
-                )
-            ],
-
-            [
-                InlineKeyboardButton(
-                    text="📊 Statistics",
-                    callback_data="admin_stats"
-                ),
-                InlineKeyboardButton(
-                    text="💰 Balance Tools",
-                    callback_data="admin_balance"
-                )
-            ],
-
-            [
-                InlineKeyboardButton(
-                    text="🔒 Security",
-                    callback_data="admin_security"
-                ),
-                InlineKeyboardButton(
-                    text="⚙️ Settings",
-                    callback_data="admin_settings"
-                )
-            ]
-
-        ]
+    user = create_user(
+        user_id=message.from_user.id,
+        username=message.from_user.username,
+        first_name=message.from_user.first_name
     )
 
-
-# =========================================================
-# BACK BUTTON
-# =========================================================
-
-def back_keyboard():
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-
-            [
-                InlineKeyboardButton(
-                    text="⬅️ Back",
-                    callback_data="admin_back"
-                )
-            ]
-
-        ]
-    )
-
-
-# =========================================================
-# ADMIN HOME
-# =========================================================
-
-async def admin_panel(message: Message):
-
-    if not is_admin(message.from_user.id):
+    # Account frozen
+    if user[6] == 1:
 
         await message.answer(
-            "❌ <b>Access Denied</b>\n\n"
-            "You are not authorized to access the admin panel.",
+            "🔒 <b>ACCOUNT FROZEN</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "Your account is currently frozen.\n\n"
+            "Please contact support for assistance.",
             parse_mode="HTML"
         )
 
         return
 
+    # Premium home screen
     await message.answer(
 
-        "👑 <b>ADMIN CONTROL CENTER</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "🏦 Welcome back, Admin!\n\n"
-        "Manage your virtual bank from the buttons below.\n\n"
-        "🔹 Users\n"
-        "🔹 Transactions\n"
-        "🔹 Requests\n"
-        "🔹 Balance\n"
-        "🔹 Security\n"
-        "🔹 Settings\n\n"
-        "━━━━━━━━━━━━━━━━━━",
+        f"🏦 <b>MYBANK</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
 
-        reply_markup=admin_keyboard(),
+        f"👋 Welcome back,\n"
+        f"<b>{user[2]}</b>\n\n"
 
-        parse_mode="HTML"
-    )
+        f"💰 <b>AVAILABLE BALANCE</b>\n\n"
+        f"<code>₹ {user[4]:,.2f}</code>\n\n"
 
+        f"🔢 Account Number\n"
+        f"<code>{user[3]}</code>\n\n"
 
-# =========================================================
-# BACK TO ADMIN
-# =========================================================
+        f"🟢 Account Active\n\n"
 
-async def admin_back(callback: CallbackQuery):
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"<b>QUICK ACTIONS</b>",
 
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
-        )
-
-        return
-
-    await callback.message.edit_text(
-
-        "👑 <b>ADMIN CONTROL CENTER</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        "🏦 Welcome back, Admin!\n\n"
-        "Select what you want to manage:",
-        
-        reply_markup=admin_keyboard(),
+        reply_markup=user_menu(),
 
         parse_mode="HTML"
     )
 
-    await callback.answer()
+
+# =========================================================
+# REGISTER ALL MODULES
+# =========================================================
+
+def register_handlers():
+
+    # User
+    register_user_handlers(dp)
+
+    # Transactions
+    register_transaction_handlers(dp)
+
+    # Payments
+    register_payment_handlers(dp)
+
+    # Admin
+    register_admin_handlers(dp)
 
 
 # =========================================================
-# USERS
+# MAIN
 # =========================================================
 
-async def admin_users(callback: CallbackQuery):
+async def main():
 
-    if not is_admin(callback.from_user.id):
+    # Create database/tables
+    init_db()
 
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
+    # Register handlers
+    register_handlers()
+
+    print("🏦 MyBank Bot Started")
+
+    # Start bot
+    await dp.start_polling(bot)
+
+
+# =========================================================
+# RUN
+# =========================================================
+
+if __name__ == "__main__":
+
+    try:
+        asyncio.run(main())
+
+    except KeyboardInterrupt:
+
+        print(
+            "🛑 MyBank Bot Stopped"
         )
-
-        return
-
-    con = connect()
-    cur = con.cursor()
-
-    cur.execute("""
-        SELECT user_id,
-               first_name,
-               account_no,
-               balance,
-               frozen
-        FROM users
-        ORDER BY created_at DESC
-        LIMIT 15
-    """)
-
-    rows = cur.fetchall()
-
-    con.close()
-
-    if not rows:
-
-        text = (
-            "👥 <b>USER MANAGEMENT</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "No users found."
-        )
-
-    else:
-
-        text = (
-            "👥 <b>USER MANAGEMENT</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-        )
-
-        for row in rows:
-
-            status = "🔴 Frozen" if row[4] else "🟢 Active"
-
-            text += (
-                f"👤 <b>{row[1]}</b>\n"
-                f"🆔 ID: <code>{row[0]}</code>\n"
-                f"🔢 Account: <code>{row[2]}</code>\n"
-                f"💰 Balance: ₹{row[3]:.2f}\n"
-                f"📌 Status: {status}\n\n"
-            )
-
-    await callback.message.edit_text(
-
-        text,
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
-    )
-
-    await callback.answer()
-
-
-# =========================================================
-# REQUESTS
-# =========================================================
-
-async def admin_requests(callback: CallbackQuery):
-
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
-        )
-
-        return
-
-    con = connect()
-    cur = con.cursor()
-
-    cur.execute("""
-        SELECT id,
-               user_id,
-               type,
-               amount,
-               created_at
-        FROM requests
-        WHERE status='pending'
-        ORDER BY id DESC
-        LIMIT 20
-    """)
-
-    rows = cur.fetchall()
-
-    con.close()
-
-    if not rows:
-
-        text = (
-            "📋 <b>PENDING REQUESTS</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ No pending requests."
-        )
-
-        await callback.message.edit_text(
-            text,
-            reply_markup=back_keyboard(),
-            parse_mode="HTML"
-        )
-
-        await callback.answer()
-
-        return
-
-    text = (
-        "📋 <b>PENDING REQUESTS</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-    )
-
-    keyboard = []
-
-    for row in rows:
-
-        text += (
-            f"🧾 <b>Request #{row[0]}</b>\n"
-            f"👤 User: <code>{row[1]}</code>\n"
-            f"📌 Type: {row[2]}\n"
-            f"💰 Amount: ₹{row[3]:.2f}\n"
-            f"🕐 {row[4]}\n\n"
-        )
-
-        keyboard.append([
-
-            InlineKeyboardButton(
-                text=f"✅ Approve #{row[0]}",
-                callback_data=f"approve:{row[0]}"
-            ),
-
-            InlineKeyboardButton(
-                text=f"❌ Reject #{row[0]}",
-                callback_data=f"reject:{row[0]}"
-            )
-
-        ])
-
-    keyboard.append([
-
-        InlineKeyboardButton(
-            text="⬅️ Back",
-            callback_data="admin_back"
-        )
-
-    ])
-
-    await callback.message.edit_text(
-
-        text,
-
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=keyboard
-        ),
-
-        parse_mode="HTML"
-    )
-
-    await callback.answer()
-
-
-# =========================================================
-# STATISTICS
-# =========================================================
-
-async def admin_stats(callback: CallbackQuery):
-
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
-        )
-
-        return
-
-    con = connect()
-    cur = con.cursor()
-
-    cur.execute(
-        "SELECT COUNT(*) FROM users"
-    )
-
-    users = cur.fetchone()[0]
-
-    cur.execute(
-        "SELECT COALESCE(SUM(balance),0) FROM users"
-    )
-
-    balance = cur.fetchone()[0]
-
-    cur.execute(
-        "SELECT COUNT(*) FROM transactions"
-    )
-
-    transactions = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT COUNT(*)
-        FROM requests
-        WHERE status='pending'
-    """)
-
-    pending = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT COUNT(*)
-        FROM users
-        WHERE frozen=1
-    """)
-
-    frozen = cur.fetchone()[0]
-
-    con.close()
-
-    await callback.message.edit_text(
-
-        "📊 <b>BANK STATISTICS</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-
-        f"👥 Total Users\n"
-        f"   └ {users}\n\n"
-
-        f"💰 Total Balance\n"
-        f"   └ ₹{balance:.2f}\n\n"
-
-        f"🧾 Total Transactions\n"
-        f"   └ {transactions}\n\n"
-
-        f"📋 Pending Requests\n"
-        f"   └ {pending}\n\n"
-
-        f"🔒 Frozen Accounts\n"
-        f"   └ {frozen}\n\n"
-
-        "━━━━━━━━━━━━━━━━━━",
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
-    )
-
-    await callback.answer()
-
-
-# =========================================================
-# BALANCE TOOLS
-# =========================================================
-
-async def admin_balance(callback: CallbackQuery):
-
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
-        )
-
-        return
-
-    await callback.message.edit_text(
-
-        "💰 <b>BALANCE MANAGEMENT</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-
-        "Balance tools will be available here.\n\n"
-
-        "➕ Add balance\n"
-        "➖ Deduct balance\n"
-        "🔎 Search account\n"
-        "📄 View balance history",
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
-    )
-
-    await callback.answer()
-
-
-# =========================================================
-# SECURITY
-# =========================================================
-
-async def admin_security(callback: CallbackQuery):
-
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
-        )
-
-        return
-
-    await callback.message.edit_text(
-
-        "🔒 <b>SECURITY CENTER</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-
-        "🛡️ Account protection\n"
-        "🔐 PIN system\n"
-        "🚫 Freeze suspicious users\n"
-        "📋 Security logs\n"
-        "⚠️ Fraud controls",
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
-    )
-
-    await callback.answer()
-
-
-# =========================================================
-# SETTINGS
-# =========================================================
-
-async def admin_settings(callback: CallbackQuery):
-
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "Access denied.",
-            show_alert=True
-        )
-
-        return
-
-    await callback.message.edit_text(
-
-        "⚙️ <b>BANK SETTINGS</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-
-        "💵 Transaction Fees\n"
-        "📈 Daily Limits\n"
-        "📅 Monthly Limits\n"
-        "💰 Minimum Amount\n"
-        "💰 Maximum Amount\n"
-        "🔧 Maintenance Mode",
-
-        reply_markup=back_keyboard(),
-
-        parse_mode="HTML"
-    )
-
-    await callback.answer()
-
-
-# =========================================================
-# REGISTER
-# =========================================================
-
-def register_admin_handlers(dp):
-
-    dp.message.register(
-        admin_panel,
-        Command("admin")
-    )
-
-    dp.callback_query.register(
-        admin_back,
-        F.data == "admin_back"
-    )
-
-    dp.callback_query.register(
-        admin_users,
-        F.data == "admin_users"
-    )
-
-    dp.callback_query.register(
-        admin_requests,
-        F.data == "admin_requests"
-    )
-
-    dp.callback_query.register(
-        admin_stats,
-        F.data == "admin_stats"
-    )
-
-    dp.callback_query.register(
-        admin_balance,
-        F.data == "admin_balance"
-    )
-
-    dp.callback_query.register(
-        admin_security,
-        F.data == "admin_security"
-    )
-
-    dp.callback_query.register(
-        admin_settings,
-        F.data == "admin_settings"
-    )
