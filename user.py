@@ -51,7 +51,11 @@ def user_menu():
                     text="⚙️ Settings",
                     callback_data="settings"
                 )
-            ]
+            ],
+                InlineKeyboardButton(
+                    text="🔐 Security",
+                    callback_data="security"
+               )
 
         ]
     )
