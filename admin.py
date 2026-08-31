@@ -334,6 +334,284 @@ async def admin_requests(callback: CallbackQuery):
 
     await callback.answer()
 
+# =========================================================
+# APPROVE / REJECT REQUESTS
+# =========================================================
+
+async def approve_request(callback: CallbackQuery):
+
+    if not is_admin(callback.from_user.id):
+
+        await callback.answer(
+            "Access denied.",
+            show_alert=True
+        )
+        return
+
+    request_id = int(
+        callback.data.split(":")[1]
+    )
+
+    con = connect()
+    cur = con.cursor()
+
+    # Request check
+    cur.execute("""
+        SELECT id, user_id, type, amount, status
+        FROM requests
+        WHERE id=?
+    """, (request_id,))
+
+    request = cur.fetchone()
+
+    if not request:
+
+        con.close()
+
+        await callback.answer(
+            "❌ Request not found.",
+            show_alert=True
+        )
+        return
+
+    req_id, user_id, req_type, amount, status = request
+
+    if status != "pending":
+
+        con.close()
+
+        await callback.answer(
+            f"⚠️ Already {status}.",
+            show_alert=True
+        )
+        return
+
+    # -----------------------------------------------------
+    # DEPOSIT APPROVE
+    # -----------------------------------------------------
+
+    if req_type == "DEPOSIT":
+
+        cur.execute("""
+            UPDATE users
+            SET balance = balance + ?
+            WHERE user_id=?
+        """, (amount, user_id))
+
+        cur.execute("""
+            UPDATE requests
+            SET status='approved'
+            WHERE id=? AND status='pending'
+        """, (request_id,))
+
+        # Transaction record
+        cur.execute("""
+            INSERT INTO transactions
+            (
+                user_id,
+                type,
+                amount,
+                description,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            "DEPOSIT",
+            amount,
+            f"Deposit approved #{request_id}",
+            __import__("datetime").datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        ))
+
+    # -----------------------------------------------------
+    # WITHDRAW APPROVE
+    # -----------------------------------------------------
+
+    elif req_type == "WITHDRAW":
+
+        cur.execute("""
+            UPDATE users
+            SET balance = balance - ?
+            WHERE user_id=?
+              AND balance >= ?
+        """, (
+            amount,
+            user_id,
+            amount
+        ))
+
+        if cur.rowcount == 0:
+
+            con.rollback()
+            con.close()
+
+            await callback.answer(
+                "❌ User has insufficient balance.",
+                show_alert=True
+            )
+            return
+
+        cur.execute("""
+            UPDATE requests
+            SET status='approved'
+            WHERE id=? AND status='pending'
+        """, (request_id,))
+
+        cur.execute("""
+            INSERT INTO transactions
+            (
+                user_id,
+                type,
+                amount,
+                description,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            "WITHDRAW",
+            amount,
+            f"Withdrawal approved #{request_id}",
+            __import__("datetime").datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        ))
+
+    else:
+
+        con.close()
+
+        await callback.answer(
+            "❌ Unknown request type.",
+            show_alert=True
+        )
+        return
+
+    con.commit()
+    con.close()
+
+    await callback.answer(
+        "✅ Request approved!",
+        show_alert=True
+    )
+
+    # Notify user
+    try:
+
+        if req_type == "DEPOSIT":
+
+            await callback.bot.send_message(
+                user_id,
+                f"✅ <b>DEPOSIT APPROVED</b>\n\n"
+                f"💰 Amount: <b>₹{amount:,.2f}</b>\n"
+                f"🧾 Request: <code>#{request_id}</code>\n\n"
+                f"💳 Amount has been added to your balance.",
+                parse_mode="HTML"
+            )
+
+        else:
+
+            await callback.bot.send_message(
+                user_id,
+                f"✅ <b>WITHDRAWAL APPROVED</b>\n\n"
+                f"💰 Amount: <b>₹{amount:,.2f}</b>\n"
+                f"🧾 Request: <code>#{request_id}</code>",
+                parse_mode="HTML"
+            )
+
+    except Exception as e:
+
+        print(
+            f"User notification failed: {e}"
+        )
+
+    # Refresh admin requests
+    await admin_requests(callback)
+
+
+async def reject_request(callback: CallbackQuery):
+
+    if not is_admin(callback.from_user.id):
+
+        await callback.answer(
+            "Access denied.",
+            show_alert=True
+        )
+        return
+
+    request_id = int(
+        callback.data.split(":")[1]
+    )
+
+    con = connect()
+    cur = con.cursor()
+
+    cur.execute("""
+        SELECT id, user_id, type, amount, status
+        FROM requests
+        WHERE id=?
+    """, (request_id,))
+
+    request = cur.fetchone()
+
+    if not request:
+
+        con.close()
+
+        await callback.answer(
+            "❌ Request not found.",
+            show_alert=True
+        )
+        return
+
+    req_id, user_id, req_type, amount, status = request
+
+    if status != "pending":
+
+        con.close()
+
+        await callback.answer(
+            f"⚠️ Already {status}.",
+            show_alert=True
+        )
+        return
+
+    cur.execute("""
+        UPDATE requests
+        SET status='rejected'
+        WHERE id=? AND status='pending'
+    """, (request_id,))
+
+    con.commit()
+    con.close()
+
+    await callback.answer(
+        "❌ Request rejected.",
+        show_alert=True
+    )
+
+    # Notify user
+    try:
+
+        await callback.bot.send_message(
+            user_id,
+            f"❌ <b>{req_type} REQUEST REJECTED</b>\n\n"
+            f"💰 Amount: <b>₹{amount:,.2f}</b>\n"
+            f"🧾 Request: <code>#{request_id}</code>\n\n"
+            f"Please contact support if you need help.",
+            parse_mode="HTML"
+        )
+
+    except Exception as e:
+
+        print(
+            f"User notification failed: {e}"
+        )
+
+    await admin_requests(callback)
+
 
 # =========================================================
 # STATISTICS
@@ -567,4 +845,13 @@ def register_admin_handlers(dp):
     dp.callback_query.register(
         admin_settings,
         F.data == "admin_settings"
+    )
+    dp.callback_query.register(
+    approve_request,
+    F.data.startswith("approve:")
+    )
+
+    dp.callback_query.register(
+    reject_request,
+    F.data.startswith("reject:")
     )
