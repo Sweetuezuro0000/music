@@ -1,3 +1,4 @@
+from user import register_user_handlers, user_menu
 from aiogram import F
 from aiogram.filters import Command
 from aiogram.types import (
