@@ -13,6 +13,7 @@ def user_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
 
+            # Row 1
             [
                 InlineKeyboardButton(
                     text="💸 Send Money",
@@ -24,6 +25,7 @@ def user_menu():
                 )
             ],
 
+            # Row 2
             [
                 InlineKeyboardButton(
                     text="➖ Withdraw",
@@ -35,6 +37,7 @@ def user_menu():
                 )
             ],
 
+            # Row 3
             [
                 InlineKeyboardButton(
                     text="💳 My Card",
@@ -46,16 +49,17 @@ def user_menu():
                 )
             ],
 
+            # Row 4
             [
+                InlineKeyboardButton(
+                    text="🔐 Security",
+                    callback_data="security"
+                ),
                 InlineKeyboardButton(
                     text="⚙️ Settings",
                     callback_data="settings"
                 )
-            ],
-                InlineKeyboardButton(
-                    text="🔐 Security",
-                    callback_data="security"
-               )
+            ]
 
         ]
     )
@@ -98,12 +102,14 @@ async def user_home(callback: CallbackQuery):
 
         return
 
+    # Frozen account
     if user[6] == 1:
 
         await callback.message.edit_text(
-            "🔒 <b>ACCOUNT FROZEN</b>\n\n"
-            "Your account is currently frozen.\n"
-            "Please contact support.",
+            "🔒 <b>ACCOUNT FROZEN</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "Your account is currently frozen.\n\n"
+            "Please contact support for assistance.",
             parse_mode="HTML"
         )
 
@@ -116,12 +122,13 @@ async def user_home(callback: CallbackQuery):
         f"🏦 <b>MYBANK</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
 
-        f"👋 Welcome back, <b>{user[2]}</b>\n\n"
+        f"👋 Welcome back,\n"
+        f"<b>{user[2]}</b>\n\n"
 
-        f"💰 <b>AVAILABLE BALANCE</b>\n"
+        f"💰 <b>AVAILABLE BALANCE</b>\n\n"
         f"<code>₹ {user[4]:,.2f}</code>\n\n"
 
-        f"🔢 Account\n"
+        f"🔢 Account Number\n"
         f"<code>{user[3]}</code>\n\n"
 
         f"🟢 Account Active\n\n"
@@ -167,16 +174,16 @@ async def show_balance(callback: CallbackQuery):
 
     await callback.message.edit_text(
 
-        f"💰 <b>YOUR BALANCE</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n\n"
+        "💰 <b>YOUR BALANCE</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
 
         f"<code>₹ {user[4]:,.2f}</code>\n\n"
 
-        f"🔢 Account Number\n"
+        "🔢 Account Number\n"
         f"<code>{user[3]}</code>\n\n"
 
-        f"🟢 Available Balance\n"
-        f"💳 Ready to use",
+        "🟢 Available Balance\n"
+        "💳 Ready to use",
 
         reply_markup=back_button(),
 
@@ -205,7 +212,11 @@ async def show_profile(callback: CallbackQuery):
 
         return
 
-    status = "🔴 Frozen" if user[6] else "🟢 Active"
+    status = (
+        "🔴 Frozen"
+        if user[6]
+        else "🟢 Active"
+    )
 
     username = (
         f"@{user[1]}"
@@ -215,8 +226,8 @@ async def show_profile(callback: CallbackQuery):
 
     await callback.message.edit_text(
 
-        f"👤 <b>MY PROFILE</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n\n"
+        "👤 <b>MY PROFILE</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
 
         f"👤 Name\n"
         f"<b>{user[2]}</b>\n\n"
@@ -248,7 +259,7 @@ async def show_profile(callback: CallbackQuery):
 
 
 # =========================================================
-# CARD PLACEHOLDER
+# CARD
 # =========================================================
 
 async def show_card(callback: CallbackQuery):
@@ -266,26 +277,41 @@ async def show_card(callback: CallbackQuery):
 
         return
 
+    if user[6] == 1:
+
+        await callback.answer(
+            "🔒 Account frozen.",
+            show_alert=True
+        )
+
+        return
+
+    name = (
+        user[2]
+        .upper()
+        if user[2]
+        else "CARD HOLDER"
+    )
+
     await callback.message.edit_text(
 
         "💳 <b>MY CARD</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
 
-        "┌────────────────────┐\n"
-        "│                    │\n"
-        "│      🏦 MYBANK     │\n"
-        "│                    │\n"
-        "│  •••• •••• ••••    │\n"
-        "│  1024              │\n"
-        "│                    │\n"
-        "│  CARD HOLDER       │\n"
-        "│  "
-        f"{user[2].upper()}"
-        "│\n"
-        "└────────────────────┘\n\n"
+        "┌────────────────────────┐\n"
+        "│                        │\n"
+        "│       🏦 MYBANK        │\n"
+        "│                        │\n"
+        "│   ••••  ••••  ••••     │\n"
+        "│              1024      │\n"
+        "│                        │\n"
+        "│   CARD HOLDER          │\n"
+        f"│   {name:<22}│\n"
+        "│                        │\n"
+        "└────────────────────────┘\n\n"
 
         "🔒 Card details are protected.\n\n"
-        "Virtual card features will be added here.",
+        "💳 Virtual card features will be available here.",
 
         reply_markup=back_button(),
 
@@ -306,14 +332,48 @@ async def show_settings(callback: CallbackQuery):
         "⚙️ <b>SETTINGS</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
 
+        "Manage your account preferences.\n\n"
+
         "🔐 Security\n"
         "🔔 Notifications\n"
         "🌐 Language\n"
         "❓ Help & Support\n\n"
 
-        "More settings coming soon.",
+        "Select an option from the menu.",
 
-        reply_markup=back_button(),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+
+                [
+                    InlineKeyboardButton(
+                        text="🔐 Security",
+                        callback_data="security"
+                    )
+                ],
+
+                [
+                    InlineKeyboardButton(
+                        text="🔔 Notifications",
+                        callback_data="notifications"
+                    )
+                ],
+
+                [
+                    InlineKeyboardButton(
+                        text="❓ Help & Support",
+                        callback_data="support"
+                    )
+                ],
+
+                [
+                    InlineKeyboardButton(
+                        text="⬅️ Back",
+                        callback_data="user_home"
+                    )
+                ]
+
+            ]
+        ),
 
         parse_mode="HTML"
     )
@@ -327,26 +387,31 @@ async def show_settings(callback: CallbackQuery):
 
 def register_user_handlers(dp):
 
+    # Home
     dp.callback_query.register(
         user_home,
         F.data == "user_home"
     )
 
+    # Balance
     dp.callback_query.register(
         show_balance,
         F.data == "balance"
     )
 
+    # Profile
     dp.callback_query.register(
         show_profile,
         F.data == "profile"
     )
 
+    # Card
     dp.callback_query.register(
         show_card,
         F.data == "my_card"
     )
 
+    # Settings
     dp.callback_query.register(
         show_settings,
         F.data == "settings"
