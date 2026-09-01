@@ -27,8 +27,20 @@ def subscribe_keyboard():
                     text="✅ I've Joined",
                     callback_data="check_subscription"
                 )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Terms & Conditions",
+                    url="https://graph.org/Terms--Conditions-TOC--Bank-of-Developers-Telegram-Bot-08-31"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Privacy Policy",
+                    url="https://graph.org/Privacy-Policy--Bank-of-Developers-Telegram-Bot-08-31"
+                )
             ]
-
+             
         ]
     )
 
@@ -76,7 +88,8 @@ async def subscription_required(message):
         "👥 <b>@sweetu_friends_group</b>\n\n"
 
         "After joining, press "
-        "<b>I've Joined</b> below.",
+        "<b>I've Joined</b> below."
+        "By Joining Group you agreed with our TOC and Privacy Policy",
 
         reply_markup=subscribe_keyboard(),
 
